@@ -477,6 +477,18 @@ A separate local hover/navigation check opened collection assets in 116ms after
 prefetch, not a production SLA. Production load/latency and supported-wallet
 reconnect/signing remain open; these measurements do not close launch gates.
 
+### Contract discovery foundation (#110) — 10 October 2026
+
+Implemented locally as an opt-in backend capability for epic #108: deployment and
+class-replacement discovery from accepted state diffs, with receipt provenance,
+bounded resumable scans, atomic checkpoints, reorg rewind with classification
+invalidation, and recorded history gaps. See
+[backend design](BACKEND-SCOPE.md#55-chain-wide-contract-discovery-epic-108-issue-110).
+Evidence: native and PostgreSQL tests with fixtures, and a bounded scan of
+public-RPC mainnet ranges. It is not part of any launch gate. It registers no
+collections and does not change trading policy or the existing scanner.
+Classification (#111) and catalog integration (#109) remain open.
+
 ### Release preparation — 7 October 2026
 
 - Local settings remain on disk but `.env.local` is removed from source control;

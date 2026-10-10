@@ -214,6 +214,43 @@ For decoder changes, rebuild projections from the raw journal into a separate da
 
 Build direct RPC acquisition → raw journal → our marketplace event decoder → one ERC-721 owner projection → token/order HTTP response. Drive list, offer, cancel, buy and accept-offer through the new reference contract on devnet/Sepolia and compare against direct-chain reads. Include repeated delivery, mid-block crash and synthetic canonical-fork recovery. Historical NFT replay is tested independently from new-market events, which begin at our deployment block.
 
+### 5.5 Chain-wide contract discovery (epic #108, issue #110)
+
+Discovery is a separate, opt-in capability for future catalog expansion. It does
+not register collections, change the reviewed registry, start NFT indexing or
+enable trading, and the scanner for registered sources is unchanged.
+
+- The state diff of each accepted block (`starknet_getStateUpdate`) is the source
+  of truth for deployments and `replace_class`. It includes factory
+  `deploy_syscall`s and upgrades that emit no standard event. Receipts from
+  `starknet_getBlockWithReceipts` only add positions (DEPLOY/DEPLOY_ACCOUNT
+  receipt, UDC `ContractDeployed`, `Upgraded` or another event carrying the new
+  class hash, constructor events) and event-emitter candidates. An event alone
+  never creates a deployment or class change. Records without a receipt
+  position keep block-level provenance (`state_diff`).
+- Migration 5 adds `chain.discovery_scans` (per-chain coverage start, first
+  available block, gaps, checkpoint), `chain.discovery_blocks`,
+  `chain.contract_discoveries` (the append-only journal) and
+  `chain.discovered_contracts` (a projection rebuilt from the journal). All four
+  tables hold chain-derived data and can be rebuilt.
+- Each bounded step commits blocks, journal rows, projection and checkpoint in one
+  transaction under its own advisory lock, never the marketplace projection lock.
+  Replayed blocks that match are no-ops; a conflicting or non-contiguous block is
+  rejected. Before reading, the scanner compares the checkpoint with the canonical
+  hash, walks back to the common ancestor (bounded by `maxReorgDepth`), and
+  rewinds. The rewind removes orphaned discoveries and recomputes affected
+  contracts.
+- `discovered_contracts.revision` comes from a per-chain counter and changes
+  whenever a contract's row changes, including on rewind. Classification (#111)
+  stores the revision it evaluated, so stale results can be detected.
+- The capability probe records `starknet_specVersion`, required-method support
+  and the first block whose state update the provider serves. Missing early
+  history is stored as a `history_unavailable` gap. Status reports
+  `historyComplete` only when coverage starts at genesis with no gaps.
+- Operator entry point: `node services/marketplace-backend/src/discovery-cli.mjs
+  probe|scan [toHead]|status`, configured by `DATABASE_URL`,
+  `MARKETPLACE_CHAIN`, `MARKETPLACE_RPC_URL` and `DISCOVERY_*` bounds.
+
 ## 6. Product query semantics
 
 Filtering and sorting run over the complete indexed collection, before pagination.
